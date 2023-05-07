@@ -83,6 +83,7 @@ static int translate(
 	for (i = 0; i < trans_table->size; i++) {
 		if (trans_table->table[i].v_index == second_lv) {
 			/* DO NOTHING HERE. This mem is obsoleted */
+			*physical_addr = offset /* (TODo) + translated_based_address */;
 			return 1;
 		}
 	}
