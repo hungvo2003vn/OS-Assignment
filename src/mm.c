@@ -193,7 +193,37 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
 #ifdef MMDBG
      printf("OOM: vm_map_ram out of memory \n");
 #endif
-     return -1;
+    /* it leaves the case of memory is enough but half in ram, half in swap
+     * do the swaping all to swapper to get the all in ram */
+
+    //Count number of frames allocated
+    struct framephy_struct *frame = frm_lst;
+    int allocated = 0;
+    while(frame != NULL)
+    {
+      frame = frame->fp_next;
+      allocated++;
+    }
+
+    //collect freeframe in active_mswp
+    int i, fpn;
+    for(i = 0; i < incpgnum - allocated; i++){
+        
+      if(MEMPHY_get_freefp(caller->active_mswp, &fpn) == 0){
+
+        //Create new framepage node (which is the freefp we just collected) with node's fpn = fpn
+        struct framephy_struct *frm_node = malloc(sizeof(struct framephy_struct));
+        frm_node->fpn = fpn;
+
+        //Connect the new framepage node to the frm_lst
+        frm_node->fp_next = frm_lst;
+        frm_lst = frm_node;
+      } 
+
+      else   
+        return -1; //cannot obtain anything or obtain some but not enough
+    
+    }
   }
 
   /* it leaves the case of memory is enough but half in ram, half in swap
