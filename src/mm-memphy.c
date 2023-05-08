@@ -123,7 +123,10 @@ int MEMPHY_format(struct memphy_struct *mp, int pagesz)
     /* Init head of free framephy list */ 
     fst = malloc(sizeof(struct framephy_struct));
     fst->fpn = iter;
+
+    pthread_mutex_lock(&mp->memphy_lock);
     mp->free_fp_list = fst;
+    pthread_mutex_unlock(&mp->memphy_lock);
 
     /* We have list with first element, fill in the rest num-1 element member*/
     for (iter = 1; iter < numfp ; iter++)
@@ -146,7 +149,10 @@ int MEMPHY_get_freefp(struct memphy_struct *mp, int *retfpn)
      return -1;
 
    *retfpn = fp->fpn;
+
+   pthread_mutex_lock(&mp->memphy_lock);
    mp->free_fp_list = fp->fp_next;
+   pthread_mutex_unlock(&mp->memphy_lock);
 
    /* MEMPHY is iteratively used up until its exhausted
     * No garbage collector acting then it not been released
@@ -161,7 +167,6 @@ int MEMPHY_dump(struct memphy_struct * mp)
     /*TODO dump memphy contnt mp->storage 
      *     for tracing the memory content
      */
-    
    printf("memory content: %s\n", mp->storage);
 
    return 0;
@@ -175,7 +180,10 @@ int MEMPHY_put_freefp(struct memphy_struct *mp, int fpn)
    /* Create new node with value fpn */
    newnode->fpn = fpn;
    newnode->fp_next = fp;
+
+   pthread_mutex_lock(&mp->memphy_lock);
    mp->free_fp_list = newnode;
+   pthread_mutex_unlock(&mp->memphy_lock);
 
    return 0;
 }
@@ -188,6 +196,9 @@ int init_memphy(struct memphy_struct *mp, int max_size, int randomflg)
 {
    mp->storage = (BYTE *)malloc(max_size*sizeof(BYTE));
    mp->maxsz = max_size;
+
+   /*init mem_lock*/
+   pthread_mutex_init(&mp->memphy_lock, NULL);
 
    MEMPHY_format(mp,PAGING_PAGESZ);
 

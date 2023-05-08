@@ -9,6 +9,9 @@ typedef char BYTE;
 typedef uint32_t addr_t;
 //typedef unsigned int uint32_t;
 
+#include <pthread.h>
+#include <sys/types.h>
+
 struct pgn_t{
    int pgn;
    struct pgn_t *pg_next; 
@@ -80,6 +83,9 @@ struct memphy_struct {
    /* Management structure */
    struct framephy_struct *free_fp_list;
    struct framephy_struct *used_fp_list;
+
+   /*define lock*/
+   pthread_mutex_t memphy_lock;
 };
 
 #endif

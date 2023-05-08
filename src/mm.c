@@ -85,35 +85,31 @@ int vmap_page_range(struct pcb_t *caller, // process call
            struct framephy_struct *frames,// list of the mapped frames
               struct vm_rg_struct *ret_rg)// return mapped region, the real mapped fp
 {                                         // no guarantee all given pages are mapped
-  //uint32_t * pte = malloc(sizeof(uint32_t));
-  struct framephy_struct *fpit = malloc(sizeof(struct framephy_struct));
-  //int  fpn;
+  
+  struct framephy_struct *fpit = frames;
+  
   int pgit = 0;
-  //int pgn = PAGING_PGN(addr);
+  int pgn = PAGING_PGN(addr);
 
   ret_rg->rg_end = ret_rg->rg_start = addr; // at least the very first space is usable
 
-  fpit->fp_next = frames;
 
   /* TODO map range of frame to address space 
    *      [addr to addr + pgnum*PAGING_PAGESZ
    *      in page table caller->mm->pgd[]
    */
-  fpit = fpit->fp_next; //head of the mapped frames
 
-  for(pgit = 0; pgit < pgnum; pgit++){
+ while(fpit != NULL){
 
-    int addrit = addr + pgit*PAGING_PAGESZ;
-    int pdi = PAGING_PGN(addrit);
+    //uint32_t pte = caller->mm->pgd[pgn + pgit]; //page table entry at pdi
+    pte_set_fpn(&caller->mm->pgd[pgn + pgit], fpit->fpn); //update page table
 
-    uint32_t pte = caller->mm->pgd[pdi]; //page table entry at pdi
-    pte_set_fpn(&pte, fpit->fpn); //update page table
-
-    enlist_pgn_node(&caller->mm->fifo_pgn, pdi); //Enqueue new usage page
+    enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit); //Enqueue new usage page
 
     // Update the range.
     ret_rg->rg_end += PAGING_PAGESZ;
     fpit = fpit->fp_next;
+    pgit++;
   }
 
    /* Tracking for later page replacement activities (if needed)
@@ -135,7 +131,7 @@ int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struc
 {
   int pgit, fpn;
   //struct framephy_struct *newfp_str;
-  if(frm_lst == NULL) frm_lst = malloc(sizeof(struct framephy_struct));
+  //if(frm_lst == NULL) frm_lst = malloc(sizeof(struct framephy_struct));
   *frm_lst = NULL;
   
   for(pgit = 0; pgit < req_pgnum; pgit++)
@@ -195,7 +191,8 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
 #endif
     /* it leaves the case of memory is enough but half in ram, half in swap
      * do the swaping all to swapper to get the all in ram */
-
+    
+    /*
     //Count number of frames allocated
     struct framephy_struct *frame = frm_lst;
     int allocated = 0;
@@ -224,6 +221,7 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
         return -1; //cannot obtain anything or obtain some but not enough
     
     }
+    */
   }
 
   /* it leaves the case of memory is enough but half in ram, half in swap
@@ -380,7 +378,7 @@ int print_pgtbl(struct pcb_t *caller, uint32_t start, uint32_t end)
 {
   int pgn_start,pgn_end;
   int pgit;
-
+  
   if(end == -1){
     pgn_start = 0;
     struct vm_area_struct *cur_vma = get_vma_by_num(caller->mm, 0);
@@ -391,7 +389,7 @@ int print_pgtbl(struct pcb_t *caller, uint32_t start, uint32_t end)
 
   printf("print_pgtbl: %d - %d", start, end);
   if (caller == NULL) {printf("NULL caller\n"); return -1;}
-    printf("\n");
+  printf("\n");
 
 
   for(pgit = pgn_start; pgit < pgn_end; pgit++)
