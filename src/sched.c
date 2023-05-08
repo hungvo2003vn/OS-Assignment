@@ -79,6 +79,7 @@ struct pcb_t * get_mlq_proc(void) {
 			{
 				mlq_ready_queue[i].slot = MAX_PRIO - i;
 			}
+			break;
 		}	
 	}
 	pthread_mutex_unlock(&queue_lock);
