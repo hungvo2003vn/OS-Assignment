@@ -96,7 +96,7 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
   /*Attempt to increate limit to get space */
   struct vm_area_struct *cur_vma = get_vma_by_num(caller->mm, vmaid);
   int inc_sz = PAGING_PAGE_ALIGNSZ(size);
-  //int inc_limit_ret
+  
   int old_sbrk ;
 
   old_sbrk = cur_vma->sbrk;
@@ -177,8 +177,6 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
   if (!PAGING_PAGE_PRESENT(pte))
   { /* Page is not online, make it actively living */
     int vicpgn, swpfpn; 
-    //int vicfpn;
-    //uint32_t vicpte;
 
     int tgtfpn = PAGING_SWP(pte);//the target frame storing our variable
 
@@ -414,7 +412,7 @@ int validate_overlap_vm_area(struct pcb_t *caller, int vmaid, int vmastart, int 
   /* TODO validate the planned memory area is not overlapped */
   struct vm_area_struct *cur_vma = caller->mm->mmap;
 
-  return OVERLAP(cur_vma->vm_start, cur_vma->vm_end, vmastart, vmaend);
+  return OVERLAP(cur_vma->vm_start, cur_vma->vm_end, vmastart, vmaend)?1:-1;
 }
 
 /*inc_vma_limit - increase vm area limits to reserve space for new variable
@@ -436,9 +434,8 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
   /*Validate overlap of obtained region */
   if (validate_overlap_vm_area(caller, vmaid, area->rg_start, area->rg_end) < 0)
     return -1; /*Overlap and failed allocation */
-  
-  cur_vma->sbrk = area->rg_end; 
 
+  cur_vma->sbrk = area->rg_end;
   /* The obtained vm area (only) 
    * now will be alloc real ram region */
   cur_vma->vm_end += inc_sz;
@@ -461,6 +458,8 @@ int find_victim_page(struct mm_struct *mm, int *retpgn)
 
   /* TODO: Implement the theorical mechanism to find the victim page */
   struct pgn_t *pre_pg = NULL; 
+
+  if(pg == NULL) return -1; //RAM is busy
 
   while(pg != NULL && pg->pg_next != NULL){
     pre_pg = pg;

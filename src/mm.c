@@ -101,9 +101,7 @@ int vmap_page_range(struct pcb_t *caller, // process call
 
  while(fpit != NULL){
 
-    //uint32_t pte = caller->mm->pgd[pgn + pgit]; //page table entry at pdi
     pte_set_fpn(&caller->mm->pgd[pgn + pgit], fpit->fpn); //update page table
-
     enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit); //Enqueue new usage page
 
     // Update the range.
@@ -130,9 +128,6 @@ int vmap_page_range(struct pcb_t *caller, // process call
 int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struct** frm_lst)
 {
   int pgit, fpn;
-  //struct framephy_struct *newfp_str;
-  //if(frm_lst == NULL) frm_lst = malloc(sizeof(struct framephy_struct));
-  *frm_lst = NULL;
   
   for(pgit = 0; pgit < req_pgnum; pgit++)
   {
@@ -187,12 +182,9 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
   if (ret_alloc == -3000) 
   {
 #ifdef MMDBG
-     printf("OOM: vm_map_ram out of memory \n");
+    printf("----OOM: vm_map_ram out of memory----\n");
 #endif
-    /* it leaves the case of memory is enough but half in ram, half in swap
-     * do the swaping all to swapper to get the all in ram */
     
-    /*
     //Count number of frames allocated
     struct framephy_struct *frame = frm_lst;
     int allocated = 0;
@@ -202,26 +194,40 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
       allocated++;
     }
 
-    //collect freeframe in active_mswp
-    int i, fpn;
+    //RAM is full, move some frames in RAM to swap to get more space in RAM
+    int i;
+    int vicpgn, swpfpn;
+
     for(i = 0; i < incpgnum - allocated; i++){
-        
-      if(MEMPHY_get_freefp(caller->active_mswp, &fpn) == 0){
 
-        //Create new framepage node (which is the freefp we just collected) with node's fpn = fpn
-        struct framephy_struct *frm_node = malloc(sizeof(struct framephy_struct));
-        frm_node->fpn = fpn;
+      /* Get free frame in MEMSWP */
+      if(MEMPHY_get_freefp(caller->active_mswp, &swpfpn) < 0) return -1;
 
-        //Connect the new framepage node to the frm_lst
-        frm_node->fp_next = frm_lst;
-        frm_lst = frm_node;
-      } 
+      /* Find victim page in virtual mem */
+      if(find_victim_page(caller->mm, &vicpgn) < 0) return -1;
 
-      else   
-        return -1; //cannot obtain anything or obtain some but not enough
-    
+      /*victim in ram*/
+      uint32_t pte_vm = caller->mm->pgd[vicpgn];
+      int ram_vicpgn = PAGING_FPN(pte_vm);
+
+      /* Do swap frame from MEMRAM to MEMSWP and vice versa*/
+      /* Copy victim frame to swap */
+      __swap_cp_page(caller->mram, ram_vicpgn, caller->active_mswp, swpfpn);
+
+      /* Update page table */
+      pte_set_swap(&pte_vm, 0, swpfpn);
+
+      /*update freefp in RAM*/
+      MEMPHY_put_freefp(caller->mram, ram_vicpgn);
+
     }
-    */
+    /*No need exception because we handled it above*/
+    alloc_pages_range(caller, incpgnum - allocated, &frm_lst);
+  
+#ifdef MMDBG
+     printf("----OOM: vm_map_ram out of memory problem solved!----\n");
+#endif
+    return -1;
   }
 
   /* it leaves the case of memory is enough but half in ram, half in swap

@@ -170,7 +170,8 @@ int MEMPHY_dump(struct memphy_struct * mp)
      */
    pthread_mutex_lock(&mp->memphy_lock);
 
-   char content[mp->maxsz];
+   const int FIXED_SIZE = mp->maxsz;
+   char content[FIXED_SIZE];
    int i = 0;
    while(i < mp->maxsz){
       if(mp->storage[i])
