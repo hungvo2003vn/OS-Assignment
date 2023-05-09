@@ -50,7 +50,6 @@ struct pcb_t * get_mlq_proc(void) {
 	//the level to choose proc from
 	uint32_t prio_out = 0;
 
-	pthread_mutex_lock(&queue_lock);
 	while (1)
 	{
 		//get process satisfies:  
@@ -58,6 +57,7 @@ struct pcb_t * get_mlq_proc(void) {
 		if (!empty(&mlq_ready_queue[prio_out])){
 			if (mlq_ready_queue[prio_out].slot != 0)
 			{
+				pthread_mutex_lock(&queue_lock);
 				proc = dequeue(&mlq_ready_queue[prio_out]);
 				mlq_ready_queue[prio_out].slot = mlq_ready_queue[prio_out].slot - proc->code->size;
 
@@ -65,7 +65,9 @@ struct pcb_t * get_mlq_proc(void) {
 				{
 					mlq_ready_queue[prio_out].slot = 0;
 				}
-				break;
+				pthread_mutex_unlock(&queue_lock);
+				
+				return proc; //Sucessfully getproc
 			}
 		}
 		//when we touch the end of MLQ
@@ -82,8 +84,8 @@ struct pcb_t * get_mlq_proc(void) {
 			break;
 		}	
 	}
-	pthread_mutex_unlock(&queue_lock);
-	return proc;	
+	
+	return NULL; //Empty-handed collection
 }
 
 void put_mlq_proc(struct pcb_t * proc) {
