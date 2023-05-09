@@ -173,7 +173,7 @@ int MEMPHY_dump(struct memphy_struct * mp)
    while(i < mp->maxsz){
       if(mp->storage[i] != 0)
          printf("->%d", mp->storage[i]);
-      i+=2;
+      i+=1;
    }
 
    printf("->end | max size = %d\n", mp->maxsz);
