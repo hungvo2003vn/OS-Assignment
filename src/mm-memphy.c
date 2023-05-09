@@ -167,7 +167,16 @@ int MEMPHY_dump(struct memphy_struct * mp)
     /*TODO dump memphy contnt mp->storage 
      *     for tracing the memory content
      */
-   printf("memory content: %s\n", mp->storage);
+   printf("memory content: start");
+
+   int i = 0;
+   while(i < mp->maxsz){
+      if(mp->storage[i] != 0)
+         printf("->%d", mp->storage[i]);
+      i+=2;
+   }
+
+   printf("->end | max size = %d\n", mp->maxsz);
 
    return 0;
 }
