@@ -7,6 +7,7 @@
 #include "mm.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 /*
  *  MEMPHY_mv_csr - move MEMPHY cursor
@@ -167,16 +168,19 @@ int MEMPHY_dump(struct memphy_struct * mp)
     /*TODO dump memphy contnt mp->storage 
      *     for tracing the memory content
      */
-   printf("memory content: start");
+   pthread_mutex_lock(&mp->memphy_lock);
 
+   char content[mp->maxsz];
    int i = 0;
    while(i < mp->maxsz){
-      if(mp->storage[i] != 0)
-         printf("->%d", mp->storage[i]);
-      i+=1;
+      if(mp->storage[i])
+         content[strlen(content)] = mp->storage[i];
+      ++i;
    }
 
-   printf("->end | max size = %d\n", mp->maxsz);
+   printf("memory content: %s | max size = %d\n", content, mp->maxsz);
+
+   pthread_mutex_unlock(&mp->memphy_lock);
 
    return 0;
 }
