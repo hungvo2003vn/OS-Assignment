@@ -101,7 +101,10 @@ int vmap_page_range(struct pcb_t *caller, // process call
 
  while(fpit != NULL){
 
-    pte_set_fpn(&caller->mm->pgd[pgn + pgit], fpit->fpn); //update page table
+    uint32_t pte = caller->mm->pgd[pgn + pgit];
+    pte_set_fpn(&pte, fpit->fpn); //update page table
+    caller->mm->pgd[pgn + pgit] = pte;
+    
     enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit); //Enqueue new usage page
 
     // Update the range.
@@ -201,10 +204,20 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
     for(i = 0; i < incpgnum - allocated; i++){
 
       /* Get free frame in MEMSWP */
-      if(MEMPHY_get_freefp(caller->active_mswp, &swpfpn) < 0) return -1;
+      if(MEMPHY_get_freefp(caller->active_mswp, &swpfpn) < 0){
+#ifdef MMDBG
+    printf("----OOM: vm_map_ram out of memory - no freeframe in swapper----\n");
+#endif
+        return -1;
+      }
 
       /* Find victim page in virtual mem */
-      if(find_victim_page(caller->mm, &vicpgn) < 0) return -1;
+      if(find_victim_page(caller->mm, &vicpgn) < 0) {
+#ifdef MMDBG
+    printf("----OOM: vm_map_ram out of memory - no victim to swapoff----: get %d freeframes in swapper\n", (i+1));
+#endif
+        return -1;
+      }
 
       /*victim in ram*/
       uint32_t pte_vm = caller->mm->pgd[vicpgn];
@@ -216,6 +229,7 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
 
       /* Update page table */
       pte_set_swap(&pte_vm, 0, swpfpn);
+      caller->mm->pgd[vicpgn] = pte_vm;
 
       /*update freefp in RAM*/
       MEMPHY_put_freefp(caller->mram, ram_vicpgn);
@@ -227,7 +241,8 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
 #ifdef MMDBG
      printf("----OOM: vm_map_ram out of memory problem solved!----\n");
 #endif
-    return -1;
+    return 0;
+    //return -1;
   }
 
   /* it leaves the case of memory is enough but half in ram, half in swap
@@ -376,7 +391,7 @@ int print_list_pgn(struct pgn_t *ip)
        printf("va[%d]-\n",ip->pgn);
        ip = ip->pg_next;
    }
-   printf("n");
+   printf("\n");
    return 0;
 }
 
@@ -396,7 +411,6 @@ int print_pgtbl(struct pcb_t *caller, uint32_t start, uint32_t end)
   printf("print_pgtbl: %d - %d", start, end);
   if (caller == NULL) {printf("NULL caller\n"); return -1;}
   printf("\n");
-
 
   for(pgit = pgn_start; pgit < pgn_end; pgit++)
   {

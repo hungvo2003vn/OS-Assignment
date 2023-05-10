@@ -204,10 +204,12 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
     /* Update page table */
     //pte_set_swap() &mm->pgd;
     pte_set_swap(&pte_vm, 0, swpfpn);
+    mm->pgd[vicpgn] = pte_vm;
 
     /* Update its online status of the target page */
     //pte_set_fpn() & mm->pgd[pgn];
     pte_set_fpn(&pte, tgtfpn);
+    mm->pgd[pgn] = pte;
 
     enlist_pgn_node(&caller->mm->fifo_pgn, pgn);
   }
@@ -407,7 +409,6 @@ struct vm_rg_struct* get_vm_area_node_at_brk(struct pcb_t *caller, int vmaid, in
  */
 int validate_overlap_vm_area(struct pcb_t *caller, int vmaid, int vmastart, int vmaend)
 {
-  //struct vm_area_struct *vma = caller->mm->mmap;
 
   /* TODO validate the planned memory area is not overlapped */
   struct vm_area_struct *cur_vma = caller->mm->mmap;
@@ -527,6 +528,7 @@ int get_free_vmrg_area(struct pcb_t *caller, int vmaid, int size, struct vm_rg_s
           rgit->rg_next = NULL;
         }
       }
+      
     }
     else
     {
