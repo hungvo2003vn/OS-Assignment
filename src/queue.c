@@ -27,7 +27,7 @@ struct pcb_t * dequeue(struct queue_t * q) {
 
 	for (j = 1; j < q->size; j++)
 	{
-		if (q->proc[j]->priority > q->proc[max_prio]->priority)
+		if (q->proc[j]->priority < q->proc[max_prio]->priority)
 			max_prio = j;
 	}
 
