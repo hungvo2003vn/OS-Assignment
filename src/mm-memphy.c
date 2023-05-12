@@ -171,15 +171,15 @@ int MEMPHY_dump(struct memphy_struct * mp)
    pthread_mutex_lock(&mp->memphy_lock);
 
    const int FIXED_SIZE = mp->maxsz;
-   char content[FIXED_SIZE];
-   int i = 0;
+   char content[FIXED_SIZE]; //enough space for output format
+   int i = 0, index = 0;
    while(i < mp->maxsz){
       if(mp->storage[i])
-         content[strlen(content)] = mp->storage[i];
+         index += sprintf(&content[index], "[%d,%d] ", i, mp->storage[i]);
       ++i;
    }
 
-   printf("memory content: %s | max size = %d\n", content, mp->maxsz);
+   printf("Memory content [addr, value]: %s| max size = %d\n",content, mp->maxsz);
 
    pthread_mutex_unlock(&mp->memphy_lock);
 

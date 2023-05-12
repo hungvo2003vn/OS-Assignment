@@ -78,6 +78,7 @@ struct vm_rg_struct *get_symrg_byid(struct mm_struct *mm, int rgid)
  */
 int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr)
 {
+  
   /*Allocate at the toproof */
   struct vm_rg_struct rgnode;
 
@@ -87,10 +88,10 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
     caller->mm->symrgtbl[rgid].rg_end = rgnode.rg_end;
 
     *alloc_addr = rgnode.rg_start;
-
+    
     return 0;
   }
-
+  
   /* TODO get_free_vmrg_area FAILED handle the region management (Fig.6)*/
 
   /*Attempt to increate limit to get space */
@@ -98,7 +99,6 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
   int inc_sz = PAGING_PAGE_ALIGNSZ(size);
   
   int old_sbrk ;
-
   old_sbrk = cur_vma->sbrk;
 
   /* TODO INCREASE THE LIMIT
@@ -112,7 +112,7 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
   caller->mm->symrgtbl[rgid].rg_end = old_sbrk + size;
 
   *alloc_addr = old_sbrk;
-
+  
   return 0;
 }
 
@@ -300,7 +300,7 @@ int pgread(
 
   destination = (uint32_t) data;
 #ifdef IODUMP
-  printf("read region=%d offset=%d value=%d\n", source, offset, data);
+  printf("[PID: %d] read region=%d offset=%d value=%d\n", proc->pid,source, offset, data);
 #ifdef PAGETBL_DUMP
   print_pgtbl(proc, 0, -1); //print max TBL
 #endif
@@ -328,7 +328,7 @@ int __write(struct pcb_t *caller, int vmaid, int rgid, int offset, BYTE value)
 	  return -1;
 
   pg_setval(caller->mm, currg->rg_start + offset, value, caller);
-
+  
   return 0;
 }
 
@@ -340,7 +340,7 @@ int pgwrite(
 		uint32_t offset)
 {
 #ifdef IODUMP
-  printf("write region=%d offset=%d value=%d\n", destination, offset, data);
+  printf("[PID: %d] write region=%d offset=%d value=%d\n", proc->pid, destination, offset, data);
 #ifdef PAGETBL_DUMP
   print_pgtbl(proc, 0, -1); //print max TBL
 #endif
@@ -528,7 +528,7 @@ int get_free_vmrg_area(struct pcb_t *caller, int vmaid, int size, struct vm_rg_s
           rgit->rg_next = NULL;
         }
       }
-      
+
     }
     else
     {

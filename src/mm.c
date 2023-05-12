@@ -101,7 +101,7 @@ int vmap_page_range(struct pcb_t *caller, // process call
 
  while(fpit != NULL){
 
-    uint32_t pte = caller->mm->pgd[pgn + pgit];
+    uint32_t pte = 0;//caller->mm->pgd[pgn + pgit];
     pte_set_fpn(&pte, fpit->fpn); //update page table
     caller->mm->pgd[pgn + pgit] = pte;
     
@@ -177,6 +177,7 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
    *duplicate control mechanism, keep it simple
    */
   ret_alloc = alloc_pages_range(caller, incpgnum, &frm_lst);
+  
 
   if (ret_alloc < 0 && ret_alloc != -3000)
     return -1;
@@ -203,18 +204,19 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
 
     for(i = 0; i < incpgnum - allocated; i++){
 
-      /* Get free frame in MEMSWP */
-      if(MEMPHY_get_freefp(caller->active_mswp, &swpfpn) < 0){
+      /* Find victim page in virtual mem */
+      if(find_victim_page(caller->mm, &vicpgn) < 0) {
 #ifdef MMDBG
-    printf("----OOM: vm_map_ram out of memory - no freeframe in swapper----\n");
+    printf("----OOM: vm_map_ram out of memory - no victim to swapoff----: get %d freeframes in swapper\n", i);
+    printf("---- requests: %d, allocated: %d----\n", incpgnum, allocated);
 #endif
         return -1;
       }
 
-      /* Find victim page in virtual mem */
-      if(find_victim_page(caller->mm, &vicpgn) < 0) {
+      /* Get free frame in MEMSWP */
+      if(MEMPHY_get_freefp(caller->active_mswp, &swpfpn) < 0){
 #ifdef MMDBG
-    printf("----OOM: vm_map_ram out of memory - no victim to swapoff----: get %d freeframes in swapper\n", (i+1));
+    printf("----OOM: vm_map_ram out of memory - no freeframe in swapper----\n");
 #endif
         return -1;
       }
