@@ -176,17 +176,17 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
  
   if (!PAGING_PAGE_PRESENT(pte))
   { /* Page is not online, make it actively living */
-    int vicpgn, swpfpn; 
+    struct pgn_t *fifo_node = malloc(sizeof(struct pgn_t));
+    int swpfpn; 
 
     int tgtfpn = PAGING_SWP(pte);//the target frame storing our variable
 
     /* TODO: Play with your paging theory here */
     /* Find victim page in virtual mem */
-    if(find_victim_page(caller->mm, &vicpgn) < 0) return -1;
+    if(find_victim_page(caller->mram, fifo_node) < 0) return -1;
 
     /*victim in ram*/
-    uint32_t pte_vm = mm->pgd[vicpgn];
-    int ram_vicpgn = PAGING_FPN(pte_vm);
+    int ram_vicpgn = PAGING_FPN(*fifo_node->pgd_pgn);
 
     /* Get free frame in MEMSWP */
     if(MEMPHY_get_freefp(caller->active_mswp, &swpfpn) < 0) return -1;
@@ -203,15 +203,15 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
 
     /* Update page table */
     //pte_set_swap() &mm->pgd;
-    pte_set_swap(&pte_vm, 0, swpfpn);
-    mm->pgd[vicpgn] = pte_vm;
+    pte_set_swap(fifo_node->pgd_pgn, 0, swpfpn);
+    free(fifo_node); //avoid mem leak
 
     /* Update its online status of the target page */
     //pte_set_fpn() & mm->pgd[pgn];
     pte_set_fpn(&pte, tgtfpn);
     mm->pgd[pgn] = pte;
 
-    enlist_pgn_node(&caller->mm->fifo_pgn, pgn);
+    enlist_pgn_node(caller->mram, pgn, &mm->pgd[pgn]);
   }
 
   *fpn = PAGING_FPN(pte);
@@ -453,9 +453,10 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
  *@pgn: return page number
  *
  */
-int find_victim_page(struct mm_struct *mm, int *retpgn) 
+int find_victim_page(struct memphy_struct *mp, struct pgn_t *fifo_node)
 {
-  struct pgn_t *pg = mm->fifo_pgn;
+  pthread_mutex_lock(&mp->memphy_lock);
+  struct pgn_t *pg = mp->fifo_pgn;
 
   /* TODO: Implement the theorical mechanism to find the victim page */
   struct pgn_t *pre_pg = NULL; 
@@ -467,12 +468,12 @@ int find_victim_page(struct mm_struct *mm, int *retpgn)
     pg = pg->pg_next;
   }
 
-  *retpgn = pg->pgn; //victim in FIFO is the end of the linked list
+  fifo_node->pgd_pgn = pg->pgd_pgn; //victim in FIFO is the end of the linked list
 
   free(pg);
 
   if(pre_pg != NULL) pre_pg->pg_next = NULL; // set current end to NULL
-
+  pthread_mutex_unlock(&mp->memphy_lock);
   return 0;
 }
 

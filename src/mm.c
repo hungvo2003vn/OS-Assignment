@@ -105,7 +105,7 @@ int vmap_page_range(struct pcb_t *caller, // process call
     pte_set_fpn(&pte, fpit->fpn); //update page table
     caller->mm->pgd[pgn + pgit] = pte;
     
-    enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit); //Enqueue new usage page
+    enlist_pgn_node(caller->mram, pgn + pgit, &caller->mm->pgd[pgn + pgit]); //Enqueue new usage page
 
     // Update the range.
     ret_rg->rg_end += PAGING_PAGESZ;
@@ -199,19 +199,24 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
     }
 
     //RAM is full, move some frames in RAM to swap to get more space in RAM
-    int i;
-    int vicpgn, swpfpn;
+    int i; 
+    int swpfpn;
 
     for(i = 0; i < incpgnum - allocated; i++){
+      
+      struct pgn_t *fifo_node = malloc(sizeof(struct pgn_t));
 
-      /* Find victim page in virtual mem */
-      if(find_victim_page(caller->mm, &vicpgn) < 0) {
+      /* Find victim page in RAM */
+      if(find_victim_page(caller->mram, fifo_node) < 0) {
 #ifdef MMDBG
     printf("----OOM: vm_map_ram out of memory - no victim to swapoff----: get %d freeframes in swapper\n", (i+1));
     printf("---- requests: %d, allocated: %d----\n", incpgnum, allocated);
 #endif
         return -1;
       }
+
+      /*victim in ram*/
+      int ram_vicpgn = PAGING_FPN(*fifo_node->pgd_pgn);
 
       /* Get free frame in MEMSWP */
       if(MEMPHY_get_freefp(caller->active_mswp, &swpfpn) < 0){
@@ -221,17 +226,13 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
         return -1;
       }
 
-      /*victim in ram*/
-      uint32_t pte_vm = caller->mm->pgd[vicpgn];
-      int ram_vicpgn = PAGING_FPN(pte_vm);
-
       /* Do swap frame from MEMRAM to MEMSWP and vice versa*/
       /* Copy victim frame to swap */
       __swap_cp_page(caller->mram, ram_vicpgn, caller->active_mswp, swpfpn);
 
       /* Update page table */
-      pte_set_swap(&pte_vm, 0, swpfpn);
-      caller->mm->pgd[vicpgn] = pte_vm;
+      pte_set_swap(fifo_node->pgd_pgn, 0, swpfpn);
+      free(fifo_node); //avoid mem leak
 
       /*update freefp in RAM*/
       MEMPHY_put_freefp(caller->mram, ram_vicpgn);
@@ -324,13 +325,17 @@ int enlist_vm_rg_node(struct vm_rg_struct **rglist, struct vm_rg_struct* rgnode)
   return 0;
 }
 
-int enlist_pgn_node(struct pgn_t **plist, int pgn)
+int enlist_pgn_node(struct memphy_struct *mp, int pgn, uint32_t *pgd_pgn)
 {
   struct pgn_t* pnode = malloc(sizeof(struct pgn_t));
 
   pnode->pgn = pgn;
-  pnode->pg_next = *plist;
-  *plist = pnode;
+  pnode->pgd_pgn = pgd_pgn;
+
+  pthread_mutex_lock(&mp->memphy_lock);
+  pnode->pg_next = mp->fifo_pgn;
+  mp->fifo_pgn = pnode;
+  pthread_mutex_unlock(&mp->memphy_lock);
 
   return 0;
 }

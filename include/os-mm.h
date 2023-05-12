@@ -15,6 +15,7 @@ typedef uint32_t addr_t;
 struct pgn_t{
    int pgn;
    struct pgn_t *pg_next; 
+   uint32_t *pgd_pgn; //Bonus page directory reference
 };
 
 /*
@@ -57,7 +58,7 @@ struct mm_struct {
    struct vm_rg_struct symrgtbl[PAGING_MAX_SYMTBL_SZ];
 
    /* list of free page */
-   struct pgn_t *fifo_pgn;
+   struct pgn_t *fifo_pgn; //useless
 };
 
 /*
@@ -86,6 +87,9 @@ struct memphy_struct {
 
    /*define lock*/
    pthread_mutex_t memphy_lock;
+
+   /*FIFO Ram*/
+   struct pgn_t *fifo_pgn; //The one we will use
 };
 
 #endif
