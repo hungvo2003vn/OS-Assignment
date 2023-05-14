@@ -282,6 +282,9 @@ int __read(struct pcb_t *caller, int vmaid, int rgid, int offset, BYTE *data)
   if(currg == NULL || cur_vma == NULL) /* Invalid memory identify */
 	  return -1;
 
+  if(currg->rg_start + offset > currg->rg_end) /* Invalid offset*/
+    return -1;
+  
   pg_getval(caller->mm, currg->rg_start + offset, data, caller);
 
   return 0;
@@ -326,6 +329,9 @@ int __write(struct pcb_t *caller, int vmaid, int rgid, int offset, BYTE value)
   
   if(currg == NULL || cur_vma == NULL) /* Invalid memory identify */
 	  return -1;
+
+  if(currg->rg_start + offset > currg->rg_end) /* Invalid offset*/
+    return -1;
 
   pg_setval(caller->mm, currg->rg_start + offset, value, caller);
   
@@ -528,7 +534,7 @@ int get_free_vmrg_area(struct pcb_t *caller, int vmaid, int size, struct vm_rg_s
           rgit->rg_next = NULL;
         }
       }
-
+      break; //Found free region
     }
     else
     {

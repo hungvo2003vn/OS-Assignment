@@ -6,10 +6,10 @@
 /* CPU Bus definition */
 #define PAGING_CPU_BUS_WIDTH 22 /* 22bit bus - MAX SPACE 4MB */
 #define PAGING_PAGESZ  256      /* 256B or 8-bits PAGE NUMBER */
-#define PAGING_MEMRAMSZ BIT(10) /* 1MB */
+#define PAGING_MEMRAMSZ BIT(10) /* 1KB */
 #define PAGING_PAGE_ALIGNSZ(sz) (DIV_ROUND_UP(sz,PAGING_PAGESZ)*PAGING_PAGESZ)
 
-#define PAGING_MEMSWPSZ BIT(14) /* 16MB */
+#define PAGING_MEMSWPSZ BIT(14) /* 16KB */
 #define PAGING_SWPFPN_OFFSET 5  
 #define PAGING_MAX_PGN  (DIV_ROUND_UP(BIT(PAGING_CPU_BUS_WIDTH),PAGING_PAGESZ)) //fix 
 
@@ -60,7 +60,7 @@
 /* SWAPFPN */
 #define PAGING_SWP_LOBIT NBITS(PAGING_PAGESZ)
 #define PAGING_SWP_HIBIT (NBITS(PAGING_MEMSWPSZ) - 1)
-#define PAGING_SWP(pte) ((pte&PAGING_SWP_MASK) >> PAGING_SWPFPN_OFFSET)
+//#define PAGING_SWP(pte) ((pte&PAGING_SWP_MASK) >> PAGING_SWPFPN_OFFSET) original
 
 /* Value operators */
 #define SETBIT(v,mask) (v=v|mask)
@@ -81,11 +81,19 @@
 /* Extract Page Number*/
 #define PAGING_PGN(x)  GETVAL(x,PAGING_PGN_MASK,PAGING_ADDR_PGN_LOBIT)
 /* Extract FramePHY Number*/
-#define PAGING_FPN(x)  GETVAL(x,PAGING_FPN_MASK,PAGING_ADDR_FPN_LOBIT)
+//#define PAGING_FPN(x)  GETVAL(x,PAGING_FPN_MASK,PAGING_ADDR_FPN_LOBIT) //original
 /* Extract SWAPFPN */
 #define PAGING_PGN(x)  GETVAL(x,PAGING_PGN_MASK,PAGING_ADDR_PGN_LOBIT)
 /* Extract SWAPTYPE */
-#define PAGING_FPN(x)  GETVAL(x,PAGING_FPN_MASK,PAGING_ADDR_FPN_LOBIT)
+//#define PAGING_FPN(x)  GETVAL(x,PAGING_FPN_MASK,PAGING_ADDR_FPN_LOBIT) //original
+
+
+/* Extract FPN from PTE */
+#define PAGING_FPN(x) GETVAL (x, PAGING_PTE_FPN_MASK, PAGING_PTE_FPN_LOBIT);
+/* Extract FPN from swapped PTE */
+#define PAGING_SWP(x) GETVAL (x, PAGING_PTE_SWPOFF_MASK, PAGING_PTE_SWPOFF_LOBIT);
+
+
 
 /* Memory range operator */
 #define INCLUDE(x1,x2,y1,y2) (((y1-x1)*(x2-y2)>=0)?1:0)
