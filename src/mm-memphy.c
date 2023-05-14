@@ -213,6 +213,7 @@ int init_memphy(struct memphy_struct *mp, int max_size, int randomflg)
 
    /*init mem_lock*/
    pthread_mutex_init(&mp->memphy_lock, NULL);
+   pthread_mutex_init(&mp->fifo_lock, NULL);
 
    /*init FIFO RAM*/
    mp->fifo_pgn = NULL;

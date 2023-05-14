@@ -51,7 +51,7 @@ int init_pte(uint32_t *pte,
  */
 int pte_set_swap(uint32_t *pte, int swptyp, int swpoff)
 {
-  SETBIT(*pte, PAGING_PTE_PRESENT_MASK);
+  CLRBIT(*pte, PAGING_PTE_PRESENT_MASK);
   SETBIT(*pte, PAGING_PTE_SWAPPED_MASK);
 
   SETVAL(*pte, swptyp, PAGING_PTE_SWPTYP_MASK, PAGING_PTE_SWPTYP_LOBIT);
@@ -104,7 +104,7 @@ int vmap_page_range(struct pcb_t *caller, // process call
     uint32_t pte = 0;//caller->mm->pgd[pgn + pgit];
     pte_set_fpn(&pte, fpit->fpn); //update page table
     caller->mm->pgd[pgn + pgit] = pte;
-    
+
     enlist_pgn_node(caller->mram, pgn + pgit, &caller->mm->pgd[pgn + pgit]); //Enqueue new usage page
 
     // Update the range.
@@ -134,22 +134,52 @@ int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struc
   
   for(pgit = 0; pgit < req_pgnum; pgit++)
   {
-    if(MEMPHY_get_freefp(caller->mram, &fpn) == 0){
+    if(MEMPHY_get_freefp(caller->mram, &fpn) < 0)
+    {  
+      //RAM is full, move some frames in RAM to swap to get more space in RAM
+      int swpfpn;
+      struct pgn_t *fifo_node = malloc(sizeof(struct pgn_t));
 
-      //Create new framepage node (which is the freefp we just collected) with node's fpn = fpn
-      struct framephy_struct *frm_node = malloc(sizeof(struct framephy_struct));
-      frm_node->fpn = fpn;
+      /* Find victim page in RAM */
+      if(find_victim_page(caller->mram, &fifo_node) < 0) 
+      {
+        #ifdef MMDBG
+            printf("[PID: %d] ----OOM: vm_map_ram out of memory - no victim to swapoff----\n", caller->pid);
+        #endif
+        return -1;
+      }
 
-      //Connect the new framepage node to the frm_lst
-      frm_node->fp_next = *frm_lst;
-      *frm_lst = frm_node;
+      /* Get free frame in MEMSWP */
+      if(MEMPHY_get_freefp(caller->active_mswp, &swpfpn) < 0)
+      {
+        #ifdef MMDBG
+            printf("[PID: %d] ----OOM: vm_map_ram out of memory - no freeframe in swapper----\n", caller->pid);
+        #endif
+        return -1;
+      }
+
+      /*victim in ram*/
+      int ram_vicpgn = PAGING_FPN(*fifo_node->pgd_pgn);
+
+      /* Copy victim frame to swap */
+      __swap_cp_page(caller->mram, ram_vicpgn, caller->active_mswp, swpfpn);
+
+      /* Update page table */
+      pte_set_swap(fifo_node->pgd_pgn, 0, swpfpn);
+      free(fifo_node); //avoid mem leak
+
+      fpn = ram_vicpgn;
     } 
 
-    else {  // ERROR CODE of obtaining somes but not enough frames
-            if(*frm_lst != NULL) return -3000; //obtaining somes but not enough
-            return -1; //cannot obtain anything
-    } 
- }
+    /*Collect the freeframe*/
+    //Create new framepage node (which is the freefp we just collected) with node's fpn = fpn
+    struct framephy_struct *frm_node = malloc(sizeof(struct framephy_struct));
+    frm_node->fpn = fpn;
+
+    //Connect the new framepage node to the frm_lst
+    frm_node->fp_next = *frm_lst;
+    *frm_lst = frm_node;
+  }
 
   return 0;
 }
@@ -178,74 +208,17 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
    */
   ret_alloc = alloc_pages_range(caller, incpgnum, &frm_lst);
   
-
-  if (ret_alloc < 0 && ret_alloc != -3000)
-    return -1;
+  // if (ret_alloc < 0 && ret_alloc != -3000)
+  //   return -1;
 
   /* Out of memory */
-  if (ret_alloc == -3000) 
+  //if (ret_alloc == -3000) 
+  if (ret_alloc < 0)
   {
 #ifdef MMDBG
-    printf("----OOM: vm_map_ram out of memory----\n");
+    printf("[PID: %d] ----OOM: vm_map_ram out of memory----\n", caller->pid);
 #endif
-    
-    //Count number of frames allocated
-    struct framephy_struct *frame = frm_lst;
-    int allocated = 0;
-    while(frame != NULL)
-    {
-      frame = frame->fp_next;
-      allocated++;
-    }
-
-    //RAM is full, move some frames in RAM to swap to get more space in RAM
-    int i; 
-    int swpfpn;
-
-    for(i = 0; i < incpgnum - allocated; i++){
-      
-      struct pgn_t *fifo_node = malloc(sizeof(struct pgn_t));
-
-      /* Find victim page in RAM */
-      if(find_victim_page(caller->mram, fifo_node) < 0) {
-#ifdef MMDBG
-    printf("----OOM: vm_map_ram out of memory - no victim to swapoff----: get %d freeframes in swapper\n", (i+1));
-    printf("---- requests: %d, allocated: %d----\n", incpgnum, allocated);
-#endif
-        return -1;
-      }
-
-      /*victim in ram*/
-      int ram_vicpgn = PAGING_FPN(*fifo_node->pgd_pgn);
-
-      /* Get free frame in MEMSWP */
-      if(MEMPHY_get_freefp(caller->active_mswp, &swpfpn) < 0){
-#ifdef MMDBG
-    printf("----OOM: vm_map_ram out of memory - no freeframe in swapper----\n");
-#endif
-        return -1;
-      }
-
-      /* Do swap frame from MEMRAM to MEMSWP and vice versa*/
-      /* Copy victim frame to swap */
-      __swap_cp_page(caller->mram, ram_vicpgn, caller->active_mswp, swpfpn);
-
-      /* Update page table */
-      pte_set_swap(fifo_node->pgd_pgn, 0, swpfpn);
-      free(fifo_node); //avoid mem leak
-
-      /*update freefp in RAM*/
-      MEMPHY_put_freefp(caller->mram, ram_vicpgn);
-
-    }
-    /*No need exception because we handled it above*/
-    alloc_pages_range(caller, incpgnum - allocated, &frm_lst);
-  
-#ifdef MMDBG
-     printf("----OOM: vm_map_ram out of memory problem solved!----\n");
-#endif
-    return 0;
-    //return -1;
+    return -1;
   }
 
   /* it leaves the case of memory is enough but half in ram, half in swap
@@ -332,10 +305,10 @@ int enlist_pgn_node(struct memphy_struct *mp, int pgn, uint32_t *pgd_pgn)
   pnode->pgn = pgn;
   pnode->pgd_pgn = pgd_pgn;
 
-  pthread_mutex_lock(&mp->memphy_lock);
+  pthread_mutex_lock(&mp->fifo_lock);
   pnode->pg_next = mp->fifo_pgn;
   mp->fifo_pgn = pnode;
-  pthread_mutex_unlock(&mp->memphy_lock);
+  pthread_mutex_unlock(&mp->fifo_lock);
 
   return 0;
 }

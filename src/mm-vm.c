@@ -183,7 +183,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
 
     /* TODO: Play with your paging theory here */
     /* Find victim page in virtual mem */
-    if(find_victim_page(caller->mram, fifo_node) < 0) return -1;
+    if(find_victim_page(caller->mram, &fifo_node) < 0) return -1;
 
     /*victim in ram*/
     int ram_vicpgn = PAGING_FPN(*fifo_node->pgd_pgn);
@@ -194,20 +194,17 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
 
     /* Do swap frame from MEMRAM to MEMSWP and vice versa*/
     /* Copy victim frame to swap */
-    //__swap_cp_page();
     __swap_cp_page(caller->mram, ram_vicpgn, caller->active_mswp, swpfpn);
 
     /* Copy target frame from swap to mem */
-    //__swap_cp_page();
     __swap_cp_page(caller->active_mswp, tgtfpn, caller->mram, ram_vicpgn);
 
+
     /* Update page table */
-    //pte_set_swap() &mm->pgd;
     pte_set_swap(fifo_node->pgd_pgn, 0, swpfpn);
     free(fifo_node); //avoid mem leak
 
     /* Update its online status of the target page */
-    //pte_set_fpn() & mm->pgd[pgn];
     pte_set_fpn(&pte, tgtfpn);
     mm->pgd[pgn] = pte;
 
@@ -282,6 +279,9 @@ int __read(struct pcb_t *caller, int vmaid, int rgid, int offset, BYTE *data)
   if(currg == NULL || cur_vma == NULL) /* Invalid memory identify */
 	  return -1;
 
+  if(currg->rg_start + offset > currg->rg_end) /* Invalid offset*/
+    return -1;
+
   pg_getval(caller->mm, currg->rg_start + offset, data, caller);
 
   return 0;
@@ -326,6 +326,9 @@ int __write(struct pcb_t *caller, int vmaid, int rgid, int offset, BYTE value)
   
   if(currg == NULL || cur_vma == NULL) /* Invalid memory identify */
 	  return -1;
+
+  if(currg->rg_start + offset > currg->rg_end) /* Invalid offset*/
+    return -1;
 
   pg_setval(caller->mm, currg->rg_start + offset, value, caller);
   
@@ -453,9 +456,9 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
  *@pgn: return page number
  *
  */
-int find_victim_page(struct memphy_struct *mp, struct pgn_t *fifo_node)
+int find_victim_page(struct memphy_struct *mp, struct pgn_t **fifo_node)
 {
-  pthread_mutex_lock(&mp->memphy_lock);
+  pthread_mutex_lock(&mp->fifo_lock);
   struct pgn_t *pg = mp->fifo_pgn;
 
   /* TODO: Implement the theorical mechanism to find the victim page */
@@ -463,17 +466,19 @@ int find_victim_page(struct memphy_struct *mp, struct pgn_t *fifo_node)
 
   if(pg == NULL) return -1; //RAM is busy
 
-  while(pg != NULL && pg->pg_next != NULL){
+  while(pg->pg_next != NULL){
     pre_pg = pg;
     pg = pg->pg_next;
   }
 
-  fifo_node->pgd_pgn = pg->pgd_pgn; //victim in FIFO is the end of the linked list
+  (*fifo_node)->pgd_pgn = pg->pgd_pgn; //victim in FIFO is the end of the linked list
 
   free(pg);
 
   if(pre_pg != NULL) pre_pg->pg_next = NULL; // set current end to NULL
-  pthread_mutex_unlock(&mp->memphy_lock);
+  else mp->fifo_pgn = NULL; //no pre_pg case
+  
+  pthread_mutex_unlock(&mp->fifo_lock);
   return 0;
 }
 
@@ -529,7 +534,7 @@ int get_free_vmrg_area(struct pcb_t *caller, int vmaid, int size, struct vm_rg_s
           rgit->rg_next = NULL;
         }
       }
-
+      break; //Found free region
     }
     else
     {
