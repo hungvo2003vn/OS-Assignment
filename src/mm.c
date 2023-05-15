@@ -148,7 +148,7 @@ int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struc
         #endif
         return -1;
       }
-
+      printf("-----[PID: %d] victim_OOM: %08x\n", caller->pid, *fifo_node->pgd_pgn);
       /* Get free frame in MEMSWP */
       if(MEMPHY_get_freefp(caller->active_mswp, &swpfpn) < 0)
       {
@@ -247,6 +247,7 @@ int __swap_cp_page(struct memphy_struct *mpsrc, int srcfpn,
     BYTE data;
     MEMPHY_read(mpsrc, addrsrc, &data);
     MEMPHY_write(mpdst, addrdst, data);
+    MEMPHY_write(mpsrc, addrsrc, 0); //clear the old data that written in RAM by srcfpn
   }
 
   return 0;
@@ -368,7 +369,7 @@ int print_list_pgn(struct pgn_t *ip)
    printf("\n");
    while (ip != NULL )
    {
-       printf("va[%d]-\n",ip->pgn);
+       printf("va[%08x]-\n",*ip->pgd_pgn);
        ip = ip->pg_next;
    }
    printf("\n");
@@ -387,7 +388,7 @@ int print_pgtbl(struct pcb_t *caller, uint32_t start, uint32_t end)
   }
   pgn_start = PAGING_PGN(start);
   pgn_end = PAGING_PGN(end);
-
+  print_list_pgn(caller->mram->fifo_pgn);
   printf("print_pgtbl: %d - %d", start, end);
   if (caller == NULL) {printf("NULL caller\n"); return -1;}
   printf("\n");

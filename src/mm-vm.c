@@ -173,17 +173,19 @@ int pgfree_data(struct pcb_t *proc, uint32_t reg_index)
 int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
 {
   uint32_t pte = mm->pgd[pgn];
- 
+
   if (!PAGING_PAGE_PRESENT(pte))
   { /* Page is not online, make it actively living */
     struct pgn_t *fifo_node = malloc(sizeof(struct pgn_t));
     int swpfpn; 
 
     int tgtfpn = PAGING_SWP(pte);//the target frame storing our variable
+    printf("-----[PID: %d] get_page_inswap: %08x\n", caller->pid, mm->pgd[pgn]);
 
     /* TODO: Play with your paging theory here */
     /* Find victim page in virtual mem */
     if(find_victim_page(caller->mram, &fifo_node) < 0) return -1;
+    printf("-----[PID: %d] victim_pagefault: %08x\n", caller->pid, *fifo_node->pgd_pgn);
 
     /*victim in ram*/
     int ram_vicpgn = PAGING_FPN(*fifo_node->pgd_pgn);
@@ -202,12 +204,14 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
 
     /* Update page table */
     pte_set_swap(fifo_node->pgd_pgn, 0, swpfpn);
+    printf("-----[PID: %d] victim_present: %08x\n", caller->pid, *fifo_node->pgd_pgn);
     free(fifo_node); //avoid mem leak
 
     /* Update its online status of the target page */
-    pte_set_fpn(&pte, tgtfpn);
+    pte_set_fpn(&pte, ram_vicpgn);
     mm->pgd[pgn] = pte;
-
+    
+    printf("-----[PID: %d] victim_put: %08x\n", caller->pid, mm->pgd[pgn]);
     enlist_pgn_node(caller->mram, pgn, &mm->pgd[pgn]);
   }
 
@@ -300,7 +304,10 @@ int pgread(
 
   destination = (uint32_t) data;
 #ifdef IODUMP
-  printf("[PID: %d] read region=%d offset=%d value=%d\n", proc->pid,source, offset, data);
+  if(val == 0)
+    printf("[PID: %d] read region=%d offset=%d value=%d\n", proc->pid,source, offset, data);
+  else
+    printf("[PID: %d] read region=%d offset=%d: INVALID REGION OFFSET\n", proc->pid,source, offset);
 #ifdef PAGETBL_DUMP
   print_pgtbl(proc, 0, -1); //print max TBL
 #endif

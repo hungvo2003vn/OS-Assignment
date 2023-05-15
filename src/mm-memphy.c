@@ -174,12 +174,15 @@ int MEMPHY_dump(struct memphy_struct * mp)
    char content[FIXED_SIZE]; //enough space for output format
    int i = 0, index = 0;
    while(i < mp->maxsz){
-      if(mp->storage[i])
-         index += sprintf(&content[index], "[%d,%d] ", i, mp->storage[i]);
+      if(mp->storage[i]){
+         uint32_t pte = 0;
+         pte_set_fpn(&pte, i/256);
+         index += sprintf(&content[index], "\n               [%08x]-[%d,%d]", pte, (i-i/256*256), mp->storage[i]);
+      }
       ++i;
    }
 
-   printf("Memory content [addr, value]: %s| max size = %d\n",content, mp->maxsz);
+   printf("Memory content [addr]-[offset,value]: %s| max size = %d\n\n",content, mp->maxsz);
 
    pthread_mutex_unlock(&mp->memphy_lock);
 
