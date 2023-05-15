@@ -303,7 +303,10 @@ int pgread(
 
   destination = (uint32_t) data;
 #ifdef IODUMP
-  printf("[PID: %d] read region=%d offset=%d value=%d\n", proc->pid,source, offset, data);
+  if(val == 0)
+    printf("[PID: %d] read region=%d offset=%d value=%d\n", proc->pid, source, offset, data);
+  else
+    printf("[PID: %d] read region=%d offset=%d: INVALID REGION OFFSET\n", proc->pid, source, offset);
 #ifdef PAGETBL_DUMP
   print_pgtbl(proc, 0, -1); //print max TBL
 #endif
