@@ -8,7 +8,7 @@
 static struct queue_t ready_queue;
 static struct queue_t run_queue;
 static pthread_mutex_t queue_lock;
-
+//static int sig = 0;
 #ifdef MLQ_SCHED
 static struct queue_t mlq_ready_queue[MAX_PRIO];
 #endif
@@ -45,7 +45,7 @@ void init_scheduler(void) {
  *  We implement stateful here using transition technique
  *  State representation   prio = 0 .. MAX_PRIO, curr_slot = 0..(MAX_PRIO - prio)
  */
-struct pcb_t * get_mlq_proc(void) {
+struct pcb_t * get_mlq_proc(int quantumn, int *slot_left) {
 	struct pcb_t * proc = NULL;
 	//the level to choose proc from
 	uint32_t prio_out = 0;
@@ -59,10 +59,14 @@ struct pcb_t * get_mlq_proc(void) {
 			{
 				pthread_mutex_lock(&queue_lock);
 				proc = dequeue(&mlq_ready_queue[prio_out]);
-				mlq_ready_queue[prio_out].slot = mlq_ready_queue[prio_out].slot - proc->code->size;
-
+				//exception 1: size doesn't division by quantumn
+				//handle in minus_slot_except1()
+				mlq_ready_queue[prio_out].slot = mlq_ready_queue[prio_out].slot - quantumn;
+				//exception 2: out-of-resource, unfinished process
 				if (mlq_ready_queue[prio_out].slot < 0)	
 				{
+					//now slot_left is utilised
+					*slot_left = mlq_ready_queue[prio_out].slot + quantumn;
 					mlq_ready_queue[prio_out].slot = 0;
 				}
 				pthread_mutex_unlock(&queue_lock);
@@ -74,7 +78,6 @@ struct pcb_t * get_mlq_proc(void) {
 		if ((++prio_out) == MAX_PRIO)
 		{
 			prio_out = 0;
-
 			//reset our slots
 			int i;
 			for (i = 0; i < MAX_PRIO; i++)
@@ -86,6 +89,14 @@ struct pcb_t * get_mlq_proc(void) {
 	}
 	
 	return NULL; //Empty-handed collection
+}
+void minus_slot_except1(struct pcb_t * proc, int quantumn){
+	pthread_mutex_lock(&queue_lock);
+	if (proc->code->size % quantumn != 0)
+	{
+		mlq_ready_queue[proc->prio].slot = mlq_ready_queue[proc->prio].slot + quantumn - proc->code->size % quantumn;
+	}
+	pthread_mutex_unlock(&queue_lock);
 }
 
 void put_mlq_proc(struct pcb_t * proc) {
@@ -100,8 +111,8 @@ void add_mlq_proc(struct pcb_t * proc) {
 	pthread_mutex_unlock(&queue_lock);	
 }
 
-struct pcb_t * get_proc(void) {
-	return get_mlq_proc();
+struct pcb_t * get_proc(int quantumn, int *slot_left) {
+	return get_mlq_proc(quantumn, slot_left);
 }
 
 void put_proc(struct pcb_t * proc) {
@@ -147,4 +158,3 @@ void add_proc(struct pcb_t * proc) {
 	pthread_mutex_unlock(&queue_lock);	
 }
 #endif
-
