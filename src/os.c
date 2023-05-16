@@ -4,16 +4,16 @@
 #include "sched.h"
 #include "loader.h"
 #include "mm.h"
-
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
+//this var is efficient only if out-of-timeslot 
+static int slot_left = -1;
 static int time_slot;
 static int num_cpus;
 static int done = 0;
-
 #ifdef MM_PAGING
 static int memramsz;
 static int memswpsz[PAGING_MAX_MMSWP];
@@ -53,7 +53,7 @@ static void * cpu_routine(void * args) {
 		if (proc == NULL) {
 			/* No process is running, the we load new process from
 		 	* ready queue */
-			proc = get_proc();
+			proc = get_proc(time_slot, &slot_left);
 			if (proc == NULL) {
                            next_slot(timer_id);
                            continue; /* First load failed. skip dummy load */
@@ -62,15 +62,25 @@ static void * cpu_routine(void * args) {
 			/* The porcess has finish it job */
 			printf("\tCPU %d: Processed %2d has finished\n",
 				id ,proc->pid);
+			minus_slot_except1(proc, time_slot);
 			free(proc);
-			proc = get_proc();
+			proc = get_proc(time_slot, &slot_left);
 			time_left = 0;
 		}else if (time_left == 0) {
 			/* The process has done its job in current time slot */
 			printf("\tCPU %d: Put process %2d to run queue\n",
 				id, proc->pid);
 			put_proc(proc);
-			proc = get_proc();
+			proc = get_proc(time_slot, &slot_left);
+		}
+		else if (slot_left == 0)
+		{
+			/* This queue ran-out-of time slot */
+			printf("\tCPU %d: Put process %2d to run queue because of depleting resources\n",
+				id, proc->pid);
+			put_proc(proc);
+			slot_left = -1;
+			proc = get_proc(time_slot, &slot_left);
 		}
 		
 		/* Recheck process status after loading new process */
@@ -88,10 +98,11 @@ static void * cpu_routine(void * args) {
 				id, proc->pid);
 			time_left = time_slot;
 		}
-		
 		/* Run current process */
 		run(proc);
 		time_left--;
+		if (slot_left > 0)
+			slot_left--;
 		next_slot(timer_id);
 	}
 	detach_event(timer_id);
@@ -270,6 +281,5 @@ int main(int argc, char * argv[]) {
 	return 0;
 
 }
-
 
 
