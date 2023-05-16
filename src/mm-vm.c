@@ -21,11 +21,71 @@ int enlist_vm_freerg_list(struct mm_struct *mm, struct vm_rg_struct *rg_elmt)
   if (rg_elmt->rg_start >= rg_elmt->rg_end)
     return -1;
 
-  if (rg_node != NULL)
-    rg_elmt->rg_next = rg_node;
+  // if (rg_node != NULL)
+  //   rg_elmt->rg_next = rg_node;
 
-  /* Enlist the new region */
-  mm->mmap->vm_freerg_list = rg_elmt;
+  // /* Enlist the new region */
+  // mm->mmap->vm_freerg_list = rg_elmt;
+
+  /*Create newNode same value as rg_elmt*/
+  struct vm_rg_struct *newNode = malloc(sizeof(struct vm_rg_struct));
+  newNode->rg_start = rg_elmt->rg_start;
+  newNode->rg_end = rg_elmt->rg_end;
+  newNode->rg_next = NULL;
+
+  /*enlist at head of linkedlist*/
+  if(rg_node == NULL || newNode->rg_end < rg_node->rg_start)
+  {
+    newNode->rg_next = rg_node;
+    mm->mmap->vm_freerg_list = newNode;
+
+    return 0;
+  }
+
+  struct vm_rg_struct *curr = mm->mmap->vm_freerg_list;
+  struct vm_rg_struct *prev = NULL;
+  int merged = 0;
+
+  /*Merging front*/
+  while(curr != NULL)
+  {
+    if(newNode->rg_start > curr->rg_end)
+    {
+      prev = curr;
+      curr = curr->rg_next;
+    }
+
+    else if(newNode->rg_end >= curr->rg_start || newNode->rg_start <= curr->rg_end)
+    {
+      curr->rg_start = (newNode->rg_start < curr->rg_start) ? newNode->rg_start : curr->rg_start;
+      curr->rg_end = (newNode->rg_end > curr->rg_end) ? newNode->rg_end : curr->rg_end;
+
+      merged = 1;
+      free(newNode);
+      break;
+    }
+    break;
+  }
+
+  /*Merged check*/
+  if(!merged)
+  {
+    prev->rg_next = newNode;
+    newNode->rg_next = curr;
+
+    curr = newNode; //Move to the newNode position
+  }
+
+  /*Merging behind*/
+  struct vm_rg_struct *curr_next = curr->rg_next;
+  if(curr_next != NULL && curr_next->rg_start <= curr->rg_end)
+  {
+    curr->rg_end = (curr_next->rg_end > curr->rg_end) ? curr_next->rg_end : curr->rg_end;
+
+    /*clone curr_next*/
+    curr->rg_next = curr_next->rg_next;
+    free(curr_next);
+  }
 
   return 0;
 }
@@ -96,22 +156,32 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
 
   /*Attempt to increate limit to get space */
   struct vm_area_struct *cur_vma = get_vma_by_num(caller->mm, vmaid);
-  int inc_sz = PAGING_PAGE_ALIGNSZ(size);
+  //int inc_sz = PAGING_PAGE_ALIGNSZ(size);
   
   int old_sbrk ;
   old_sbrk = cur_vma->sbrk;
+  int remain = cur_vma->vm_end - old_sbrk;
+  int inc_sz;
 
   /* TODO INCREASE THE LIMIT
    * inc_vma_limit(caller, vmaid, inc_sz)
    */
-  if(inc_vma_limit(caller, vmaid, inc_sz) < 0) //overlap or out of mem
-    return -1;
-
+  if(size > remain) //not enough space for allocation
+  {
+    inc_sz = PAGING_PAGE_ALIGNSZ(size - remain);
+    if(inc_vma_limit(caller, vmaid, inc_sz) < 0) //overlap or out of mem
+      return -1;
+  }
+  
   /*Successful increase limit */
   caller->mm->symrgtbl[rgid].rg_start = old_sbrk;
   caller->mm->symrgtbl[rgid].rg_end = old_sbrk + size;
 
   *alloc_addr = old_sbrk;
+  cur_vma->sbrk += size;
+
+  printf("----After enlist----\n");
+  print_list_rg(caller->mm->mmap->vm_freerg_list);
   
   return 0;
 }
@@ -446,7 +516,6 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
   if (validate_overlap_vm_area(caller, vmaid, area->rg_start, area->rg_end) < 0)
     return -1; /*Overlap and failed allocation */
 
-  cur_vma->sbrk = area->rg_end;
   /* The obtained vm area (only) 
    * now will be alloc real ram region */
   cur_vma->vm_end += inc_sz;

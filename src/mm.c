@@ -269,8 +269,9 @@ int init_mm(struct mm_struct *mm, struct pcb_t *caller)
   vma->vm_start = 0;
   vma->vm_end = vma->vm_start;
   vma->sbrk = vma->vm_start;
-  struct vm_rg_struct *first_rg = init_vm_rg(vma->vm_start, vma->vm_end);
-  enlist_vm_rg_node(&vma->vm_freerg_list, first_rg);
+  //struct vm_rg_struct *first_rg = init_vm_rg(vma->vm_start, vma->vm_end);
+  //enlist_vm_rg_node(&vma->vm_freerg_list, first_rg);
+  vma->vm_freerg_list = NULL; //modified
 
   vma->vm_next = NULL;
   vma->vm_mm = mm; /*point back to vma owner */
@@ -388,7 +389,9 @@ int print_pgtbl(struct pcb_t *caller, uint32_t start, uint32_t end)
   }
   pgn_start = PAGING_PGN(start);
   pgn_end = PAGING_PGN(end);
+
   print_list_pgn(caller->mram->fifo_pgn);
+
   printf("print_pgtbl: %d - %d", start, end);
   if (caller == NULL) {printf("NULL caller\n"); return -1;}
   printf("\n");
