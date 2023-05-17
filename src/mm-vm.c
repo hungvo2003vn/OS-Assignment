@@ -271,6 +271,8 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
     /* Copy target frame from swap to mem */
     __swap_cp_page(caller->active_mswp, tgtfpn, caller->mram, ram_vicpgn);
 
+    /* Make the tgtfpn in activeswap free again*/
+    MEMPHY_put_freefp(caller->active_mswp, tgtfpn);
 
     /* Update page table */
     pte_set_swap(fifo_node->pgd_pgn, 0, swpfpn);
