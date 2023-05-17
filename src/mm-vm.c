@@ -179,9 +179,6 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
 
   *alloc_addr = old_sbrk;
   cur_vma->sbrk += size;
-
-  printf("----After enlist----\n");
-  print_list_rg(caller->mm->mmap->vm_freerg_list);
   
   return 0;
 }
@@ -205,6 +202,9 @@ int __free(struct pcb_t *caller, int vmaid, int rgid)
   
   /*enlist the obsoleted memory region */
   enlist_vm_freerg_list(caller->mm, rgnode);
+
+  printf("----After enlist----\n");
+  print_list_rg(caller->mm->mmap->vm_freerg_list);
 
   return 0;
 }
