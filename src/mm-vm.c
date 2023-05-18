@@ -448,7 +448,7 @@ int free_pcb_memph(struct pcb_t *caller)
   {
     pte= caller->mm->pgd[pagenum];
 
-    if (!PAGING_PAGE_PRESENT(pte))
+    if (PAGING_PAGE_PRESENT(pte))
     {
       fpn = PAGING_FPN(pte);
       MEMPHY_put_freefp(caller->mram, fpn);
