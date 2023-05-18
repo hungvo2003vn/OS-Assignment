@@ -170,7 +170,7 @@ int MEMPHY_dump(struct memphy_struct * mp)
      */
    pthread_mutex_lock(&mp->memphy_lock);
 
-   const int FIXED_SIZE = mp->maxsz;
+   const int FIXED_SIZE = 1000000;
    char content[FIXED_SIZE]; //enough space for output format
    int i = 0, index = 0;
    while(i < mp->maxsz){
@@ -213,6 +213,7 @@ int init_memphy(struct memphy_struct *mp, int max_size, int randomflg)
 {
    mp->storage = (BYTE *)malloc(max_size*sizeof(BYTE));
    mp->maxsz = max_size;
+
 
    /*init mem_lock*/
    pthread_mutex_init(&mp->memphy_lock, NULL);

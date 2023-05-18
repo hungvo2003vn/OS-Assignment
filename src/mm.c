@@ -365,7 +365,7 @@ int print_list_vma(struct vm_area_struct *ivma)
 
 int print_list_pgn(struct pgn_t *ip)
 {
-   printf("print_list_pgn: ");
+   printf("print_list_using_fpn_RAM: ");
    if (ip == NULL) {printf("NULL list\n"); return -1;}
    printf("\n");
    while (ip != NULL )
