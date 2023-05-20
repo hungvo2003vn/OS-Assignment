@@ -142,20 +142,20 @@ int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struc
 
       /* Find victim page in RAM */
       if(find_victim_page(caller->mram, &fifo_node) < 0) 
-      {
-        #ifdef MMDBG
-            printf("[PID: %d] ----OOM: vm_map_ram out of memory - no victim to swapoff----\n", caller->pid);
-        #endif
-        return -1;
-      }
-      printf("-----[PID: %d] victim_OOM: %08x\n", caller->pid, *fifo_node->pgd_pgn);
+       return -1;
+      
+
+      printf("-----[PID: %d] victim_OOR: %08x\n", caller->pid, *fifo_node->pgd_pgn);
+
       /* Get free frame in MEMSWP */
       if(MEMPHY_get_freefp(caller->active_mswp, &swpfpn) < 0)
       {
-        #ifdef MMDBG
-            printf("[PID: %d] ----OOM: vm_map_ram out of memory - no freeframe in swapper----\n", caller->pid);
-        #endif
-        return -1;
+
+        /*put the victim back to the RAM*/
+        enlist_pgn_node(caller->mram, fifo_node->pgn, fifo_node->pgd_pgn);
+        free(fifo_node); //avoid mem leak
+
+        return -3000;
       }
 
       /*victim in ram*/
@@ -208,15 +208,19 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
    */
   ret_alloc = alloc_pages_range(caller, incpgnum, &frm_lst);
   
-  // if (ret_alloc < 0 && ret_alloc != -3000)
-  //   return -1;
-
-  /* Out of memory */
-  //if (ret_alloc == -3000) 
-  if (ret_alloc < 0)
+  if (ret_alloc < 0 && ret_alloc != -3000)
   {
 #ifdef MMDBG
-    printf("[PID: %d] ----OOM: vm_map_ram out of memory----\n", caller->pid);
+    printf("[PID: %d] ----OOR: vm_map_ram failed - no victim to swapoff----\n", caller->pid);
+#endif
+    return -1;
+  }
+
+  /* Out of memory */
+  if (ret_alloc == -3000) 
+  {
+#ifdef MMDBG
+    printf("[PID: %d] ----OOM: vm_map_ram out of memory - no freeframe in swapper----\n", caller->pid);
 #endif
     return -1;
   }
