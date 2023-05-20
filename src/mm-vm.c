@@ -203,7 +203,7 @@ int __free(struct pcb_t *caller, int vmaid, int rgid)
   /*enlist the obsoleted memory region */
   enlist_vm_freerg_list(caller->mm, rgnode);
 
-  printf("----After enlist----\n");
+  printf("[PID: %d]----After enlist----\n", caller->pid);
   print_list_rg(caller->mm->mmap->vm_freerg_list);
 
   return 0;
@@ -283,7 +283,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
     pte_set_fpn(&pte, ram_vicpgn);
     mm->pgd[pgn] = pte;
     
-    printf("-----[PID: %d] victim_put: %08x\n", caller->pid, mm->pgd[pgn]);
+    printf("-----[PID: %d] target_put: %08x\n", caller->pid, mm->pgd[pgn]);
     enlist_pgn_node(caller->mram, pgn, &mm->pgd[pgn]);
   }
 

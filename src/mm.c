@@ -370,7 +370,7 @@ int print_list_pgn(struct pgn_t *ip)
    printf("\n");
    while (ip != NULL )
    {
-       printf("va[%08x]-\n",*ip->pgd_pgn);
+       printf("ra[%08x]-\n",*ip->pgd_pgn);
        ip = ip->pg_next;
    }
    printf("\n");
