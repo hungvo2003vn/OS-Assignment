@@ -522,16 +522,22 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
   int old_end = cur_vma->vm_end;
 
   /*Validate overlap of obtained region */
-  if (validate_overlap_vm_area(caller, vmaid, area->rg_start, area->rg_end) < 0)
+  if (validate_overlap_vm_area(caller, vmaid, area->rg_start, area->rg_end) < 0){
+    free(area); //avoid mem leak
     return -1; /*Overlap and failed allocation */
+  }
 
   /* The obtained vm area (only) 
    * now will be alloc real ram region */
   cur_vma->vm_end += inc_sz;
   if (vm_map_ram(caller, area->rg_start, area->rg_end, 
-                    old_end, incnumpage , newrg) < 0)
+                          old_end, incnumpage , newrg) < 0)
+  {
+    free(area); //avoid mem leak
     return -1; /* Map the memory to MEMRAM */
-
+  }
+  
+  free(area); //avoid mem leak
   return 0;
 
 }
