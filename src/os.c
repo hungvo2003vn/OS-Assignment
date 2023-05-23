@@ -60,24 +60,24 @@ static void * cpu_routine(void * args) {
                         }
 		}else if (proc->pc == proc->code->size) {
 			/* The porcess has finish it job */
-			printf("\tCPU %d: Processed %2d has finished\n",
-				id ,proc->pid);
+			printf("\tCPU %d: Processed %2d has finished at time %ld\n",
+				id ,proc->pid, current_time());
 			minus_slot_except1(proc, time_slot);
 			free(proc);
 			proc = get_proc(time_slot, &slot_left);
 			time_left = 0;
 		}else if (time_left == 0) {
 			/* The process has done its job in current time slot */
-			printf("\tCPU %d: Put process %2d to run queue\n",
-				id, proc->pid);
+			printf("\tCPU %d: Put process %2d to run queue at time %ld\n",
+				id, proc->pid, current_time());
 			put_proc(proc);
 			proc = get_proc(time_slot, &slot_left);
 		}
 		else if (slot_left == 0)
 		{
 			/* This queue ran-out-of time slot */
-			printf("\tCPU %d: Put process %2d to run queue because of depleting resources\n",
-				id, proc->pid);
+			printf("\tCPU %d: Put process %2d to run queue because of depleting resources at time %ld\n",
+				id, proc->pid, current_time());
 			put_proc(proc);
 			slot_left = -1;
 			proc = get_proc(time_slot, &slot_left);
@@ -86,7 +86,7 @@ static void * cpu_routine(void * args) {
 		/* Recheck process status after loading new process */
 		if (proc == NULL && done) {
 			/* No process to run, exit */
-			printf("\tCPU %d stopped\n", id);
+			printf("\tCPU %d stopped at time %ld\n", id, current_time());
 			break;
 		}else if (proc == NULL) {
 			/* There may be new processes to run in
@@ -94,8 +94,8 @@ static void * cpu_routine(void * args) {
 			next_slot(timer_id);
 			continue;
 		}else if (time_left == 0) {
-			printf("\tCPU %d: Dispatched process %2d\n",
-				id, proc->pid);
+			printf("\tCPU %d: Dispatched process %2d at time %ld\n",
+				id, proc->pid, current_time());
 			time_left = time_slot;
 		}
 		/* Run current process */
@@ -135,8 +135,8 @@ static void * ld_routine(void * args) {
 		proc->mswp = mswp;
 		proc->active_mswp = active_mswp;
 #endif
-		printf("\tLoaded a process at %s, PID: %d PRIO: %ld\n",
-			ld_processes.path[i], proc->pid, ld_processes.prio[i]);
+		printf("\tLoaded a process at %s, PID: %d PRIO: %ld at time %ld\n",
+			ld_processes.path[i], proc->pid, ld_processes.prio[i], current_time());
 		add_proc(proc);
 		free(ld_processes.path[i]);
 		i++;
@@ -281,5 +281,4 @@ int main(int argc, char * argv[]) {
 	return 0;
 
 }
-
 
