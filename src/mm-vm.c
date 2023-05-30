@@ -46,7 +46,7 @@ int enlist_vm_freerg_list(struct mm_struct *mm, struct vm_rg_struct *rg_elmt)
   struct vm_rg_struct *prev = NULL;
   int merged = 0;
 
-  /*Merging front*/
+  /*Merging*/
   while(curr != NULL)
   {
     if(newNode->rg_start > curr->rg_end)
@@ -55,7 +55,7 @@ int enlist_vm_freerg_list(struct mm_struct *mm, struct vm_rg_struct *rg_elmt)
       curr = curr->rg_next;
     }
 
-    else if(newNode->rg_end >= curr->rg_start || newNode->rg_start <= curr->rg_end)
+    else if(newNode->rg_end >= curr->rg_start)
     {
       curr->rg_start = (newNode->rg_start < curr->rg_start) ? newNode->rg_start : curr->rg_start;
       curr->rg_end = (newNode->rg_end > curr->rg_end) ? newNode->rg_end : curr->rg_end;
@@ -64,7 +64,7 @@ int enlist_vm_freerg_list(struct mm_struct *mm, struct vm_rg_struct *rg_elmt)
       free(newNode);
       break;
     }
-    break;
+    else break;
   }
 
   /*Merged check*/
