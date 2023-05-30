@@ -64,7 +64,7 @@ int enlist_vm_freerg_list(struct mm_struct *mm, struct vm_rg_struct *rg_elmt)
       free(newNode);
       break;
     }
-    break;
+    //break;
   }
 
   /*Merged check*/
